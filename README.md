@@ -1,51 +1,44 @@
 # Serviço de ativação de produtos
 
-Esta é a solução que desenvolvi para o desafio técnico de Java Developer Pleno/Sênior. Construí uma API REST para registrar ativações de produtos, consultar seu status e integrar com um provedor externo. Priorizei requisitos obrigatórios, regras explícitas, testes e decisões fáceis de justificar tecnicamente.
+Desenvolvi esta solução para o desafio técnico de Java Developer Pleno/Sênior. Meu objetivo foi entregar uma API REST clara e funcional para registrar ativações de produtos, consultar seu status e integrar com um provedor externo. Priorizei requisitos obrigatórios, regras de negócio explícitas, tratamento de erros e testes dos comportamentos mais importantes.
 
-## Tecnologias
+## Tecnologias que utilizei
 
-- Java 21, Spring Boot 3.5 e Maven
-- Spring Web, Bean Validation e Problem Details
-- Spring Data JPA/Hibernate, PostgreSQL e Flyway
-- H2 apenas para testes, JUnit 5, Mockito, MockMvc e Spring Boot Test
-- Springdoc OpenAPI/Swagger, Actuator, Docker e WireMock
-- GitHub Actions para build e testes a cada push/pull request
+- Java 21, Spring Boot 3.5 e Maven;
+- Spring Web, Bean Validation e Problem Details;
+- Spring Data JPA/Hibernate, PostgreSQL e Flyway;
+- H2 nos testes, JUnit 5, Mockito, MockMvc e Spring Boot Test;
+- Springdoc OpenAPI/Swagger, Actuator, Docker, Docker Compose e WireMock;
+- GitHub Actions para build e testes a cada push ou pull request.
 
-## Arquitetura
+## Como organizei a solução
 
-```text
-api/           controllers, DTOs e exceções HTTP
-config/        propriedades e cliente HTTP
-domain/        entidade, status e transições
-integration/   comunicação com o provedor
-repository/    persistência JPA
-service/       casos de uso e orquestração
-```
+- `api`: controllers, DTOs e tratamento de exceções HTTP;
+- `config`: propriedades e configuração do cliente HTTP;
+- `domain`: entidade, status e regras de transição;
+- `integration`: comunicação com o provedor externo;
+- `repository`: persistência JPA;
+- `service`: casos de uso e orquestração.
 
-O controller não contém regra de negócio. As transições ficam no domínio, a persistência fica nos serviços/repositório e a chamada HTTP ocorre fora da transação de banco.
+Mantive os controllers sem regra de negócio: eles recebem e validam a requisição, depois delegam para os serviços. Coloquei as regras de transição no domínio e mantive a chamada HTTP externa fora da transação de banco.
 
 ## Pré-requisitos
 
-- JDK 21;
-- PostgreSQL 16+ para executar sem containers;
-- Internet na primeira execução para dependências Maven;
-- Docker Desktop com Compose, somente para a execução conteinerizada.
+Para executar sem containers, eu utilizaria JDK 21, PostgreSQL 16 ou superior e acesso à Internet na primeira execução. Também deixei o Maven Wrapper versionado; por isso, não é necessário instalar Maven globalmente. No Windows, uso `./mvnw.cmd`; em Linux/macOS, `./mvnw`. Para executar a stack completa em containers, é necessário Docker Desktop com Docker Compose.
 
-O Maven Wrapper está versionado: não é preciso instalar Maven globalmente. No Windows, use `./mvnw.cmd`; em Linux/macOS, `./mvnw`.
+## Como executar
 
-## Executar
-
-### Docker Compose
+### Com Docker Compose
 
 ```powershell
 docker compose up --build
 ```
 
-O Compose sobe PostgreSQL, aplicação e WireMock. A API fica em `http://localhost:8080`; Swagger em `http://localhost:8080/swagger-ui/index.html`. O WireMock responde `204` para `POST /provider/v1/activate`.
+Com esse comando, subi PostgreSQL, a aplicação e um WireMock. A API fica em `http://localhost:8080`, e o Swagger fica em `http://localhost:8080/swagger-ui/index.html`. O WireMock simula sucesso e responde `204` para `POST /provider/v1/activate`.
 
 ### Localmente
 
-Crie um banco PostgreSQL vazio chamado `activation` e execute:
+Eu criaria um banco PostgreSQL vazio chamado `activation` e executaria:
 
 ```powershell
 $env:DB_URL="jdbc:postgresql://localhost:5432/activation"
@@ -54,18 +47,18 @@ $env:DB_PASSWORD="sua-senha"
 ./mvnw.cmd spring-boot:run
 ```
 
-| Variável | Padrão | Descrição |
+| Variável | Padrão | Como a utilizei |
 | --- | --- | --- |
-| `DB_URL` | `jdbc:postgresql://localhost:5432/activation` | URL JDBC |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/activation` | URL JDBC do banco |
 | `DB_USERNAME` | `activation` | Usuário do banco |
 | `DB_PASSWORD` | `activation` | Senha do banco |
-| `PROVIDER_BASE_URL` | `http://localhost:8081` | URL do provedor |
+| `PROVIDER_BASE_URL` | `http://localhost:8081` | URL-base do provedor |
 | `PROVIDER_CONNECT_TIMEOUT` | `2s` | Timeout de conexão |
 | `PROVIDER_READ_TIMEOUT` | `5s` | Timeout de resposta |
 
-As migrações são aplicadas automaticamente pelo Flyway. Não versione segredos.
+Configurei o Flyway para aplicar as migrações automaticamente. Não versione senhas nem segredos.
 
-## API
+## Endpoints
 
 ### Criar solicitação
 
@@ -75,66 +68,57 @@ As migrações são aplicadas automaticamente pelo Flyway. Não versione segredo
 {"externalId":"EXT-12345","customerId":"CUST-10001","productCode":"INTERNET-500"}
 ```
 
-Um novo pedido retorna `201 Created`, header `Location`, UUID, status e datas UTC/ISO-8601. Os três campos são obrigatórios, aceitam até 100 caracteres e somente letras, números, `_` e `-`.
+Quando a solicitação é nova, retorno `201 Created`, o header `Location`, UUID, status e datas em UTC/ISO-8601. Validei os três campos como obrigatórios, com até 100 caracteres e apenas letras, números, `_` e `-`.
 
 ### Consultar solicitação
 
-`GET /api/v1/requests/{id}` retorna o pedido e seu status. UUID inexistente retorna `404`. Validação, ausência e conflito usam `application/problem+json`, sem stack trace.
+`GET /api/v1/requests/{id}` retorna a solicitação e seu status. Quando o UUID não existe, retorno `404 Not Found`. Para validação, ausência e conflito, retornei respostas `application/problem+json`, sem expor stack traces ou detalhes internos.
 
-## Duplicidade e status
+## Minha decisão sobre status e duplicidade
 
-O domínio permite somente:
+Modelei apenas as transições `PENDING → PROCESSING → COMPLETED` e `PROCESSING → FAILED`.
 
-```text
-PENDING → PROCESSING → COMPLETED
-                     ↘ FAILED
-```
+Minha garantia principal contra duplicidade está na constraint `UNIQUE` de `external_id` no banco. A consulta antes da gravação melhora o caminho comum, mas não considero que ela seja suficiente: duas chamadas simultâneas ainda poderiam consultar antes de qualquer uma gravar. A constraint do banco resolve essa corrida, inclusive entre múltiplas instâncias da aplicação.
 
-`external_id` possui constraint `UNIQUE`; ela é a garantia real para chamadas simultâneas e múltiplas instâncias. A consulta prévia serve apenas ao caminho comum.
+- Para o mesmo `externalId` com o mesmo conteúdo, considero um retry idempotente e retorno `200 OK` com o recurso existente.
+- Para o mesmo `externalId` com dados diferentes, retorno `409 Conflict`.
+- Para duas chamadas idênticas em paralelo, uma grava e a outra trata a violação de unicidade, consultando o recurso já persistido.
 
-- Mesmo `externalId` e mesmo conteúdo: considero retry idempotente e retorno `200 OK` com o recurso existente.
-- Mesmo `externalId` e conteúdo diferente: retorno `409 Conflict`.
-- Chamadas idênticas em paralelo: uma grava; a outra trata a violação de unicidade e consulta o registro persistido.
+Também usei `@Version` para detectar atualizações concorrentes. Registrei a decisão em [ADR 0001](docs/adr/0001-duplicidade-e-integracao.md).
 
-Uso também `@Version` para detectar atualização concorrente. Veja a decisão em [ADR 0001](docs/adr/0001-duplicidade-e-integracao.md).
+## Minha estratégia para o provedor externo
 
-## Integração externa
+Depois de persistir e confirmar a transação de criação, marco a solicitação como `PROCESSING` e chamo `POST /provider/v1/activate`. Envio o UUID interno no header `Idempotency-Key` para permitir que o provedor também trate duplicidade.
 
-Após o commit da criação, o pedido muda para `PROCESSING` e chama `POST /provider/v1/activate` com o UUID interno no header `Idempotency-Key`.
-
-| Cenário | Status | Retry automático |
+| Cenário | Status que defini | Retry automático |
 | --- | --- | --- |
-| HTTP 2xx | `COMPLETED` | Não necessário |
+| HTTP 2xx | `COMPLETED` | Não é necessário |
 | HTTP 4xx | `FAILED` | Não |
 | HTTP 5xx | `FAILED` | Não nesta versão |
 | Timeout/falha inesperada | `FAILED` | Não |
 
-Não implementei retry cego: em timeout o provedor pode ter ativado o produto, mesmo sem resposta. Para produção, eu evoluiria com outbox transacional, worker, backoff/jitter, tentativas limitadas e reconciliação via chave de idempotência.
+Escolhi não fazer retry automático cego. Um timeout não confirma que o provedor deixou de processar a ativação; ele pode ter concluído e a resposta ter se perdido. Em uma evolução para produção, eu implementaria outbox transacional, worker assíncrono, backoff com jitter, limite de tentativas e reconciliação pela chave de idempotência.
 
-## Testes
+## Testes que implementei
 
 ```powershell
 ./mvnw.cmd test
 ```
 
-Cobri criação válida, validação, 404, unicidade no banco, transições e sucesso/falha da integração na orquestração. A suíte foi executada neste ambiente com **7 testes, 0 falhas e 0 erros**.
+Implementei testes para criação válida, validação de entrada, consulta inexistente, unicidade no banco, transições de status e os cenários de sucesso e falha na orquestração do provedor. Executei a suíte neste ambiente com **7 testes, 0 falhas e 0 erros**.
 
-Melhorias previstas: Testcontainers com PostgreSQL real, WireMock/MockWebServer nos testes HTTP e concorrência com múltiplas threads.
+Como próxima evolução, eu adicionaria Testcontainers com PostgreSQL real, WireMock/MockWebServer em testes HTTP e um teste de concorrência com múltiplas threads.
 
-## Segurança, observabilidade e lentidão
+## Segurança, observabilidade e análise de lentidão
 
-Spring Security/JWT está **documentado, não implementado**. Em produção eu usaria OAuth 2.0 Resource Server, validaria assinatura/JWKS, emissor, audiência e expiração; aplicaria `requests.write` no POST, `requests.read` no GET e isolamento por consumidor para prevenir BOLA. Credenciais do provedor ficariam em secret manager com rotação.
+Nesta entrega, deixei Spring Security/JWT **documentado, mas não implementado**. Em produção, eu configuraria OAuth 2.0 Resource Server, validaria assinatura/JWKS, emissor, audiência e expiração do JWT. Aplicaria `requests.write` no POST, `requests.read` no GET e isolamento por consumidor para prevenir BOLA. Guardaria as credenciais do provedor em um secret manager com rotação.
 
-Actuator expõe health, liveness e readiness. Para a lentidão relatada (API 300 ms → 2,5 s; banco 50 ms → 1,2 s; provedor 400 ms → 3 s), eu compararia p95/p99 por dependência, pool de conexões, planos/locks/conexões do PostgreSQL, latência/erros do provedor e traces por correlação. Com CPU a 45% e memória a 60%, investigaria primeiro cascata do provedor, rede e exaustão do pool. Validaria a correção com carga controlada e comparação antes/depois de latência, erros e saturação.
+Configurei Actuator para expor health, liveness e readiness. Para o cenário de lentidão do desafio, eu começaria separando a latência por dependência: p95/p99 da API, pool de conexões, planos e locks do PostgreSQL, além de latência e taxa de erro do provedor. Como CPU está em 45% e memória em 60%, eu investigaria primeiro uma cascata no provedor, rede ou exaustão de pool. Validaria a correção com carga controlada e compararia latência, erros e saturação antes e depois do deploy.
 
-## Pendências e evolução
+## Pontos pendentes e evolução
 
-- filtros paginados por status e cliente;
-- JWT funcional;
-- outbox, retentativas seguras e reconciliação;
-- Prometheus, logs JSON, tracing OpenTelemetry e CI;
-- Testcontainers e testes concorrentes.
+Se eu evoluísse esta solução, priorizaria filtros paginados por status e cliente; JWT funcional; outbox, retentativas seguras e reconciliação; métricas Prometheus, logs JSON, tracing OpenTelemetry e CI mais completo; Testcontainers e testes de concorrência.
 
 ## Uso de IA
 
-Utilizei IA como apoio para estruturar a solução, revisar decisões e redigir a documentação. Revisei o código para que a documentação descreva o comportamento implementado e me preparei para explicar essas escolhas tecnicamente.
+Utilizei IA como apoio para estruturar a solução, revisar decisões e redigir a documentação. Revisei o código e a documentação para garantir que descrevam somente o comportamento que está implementado e me preparei para explicar as decisões técnicas apresentadas neste repositório.
