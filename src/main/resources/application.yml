@@ -1,0 +1,19 @@
+spring:
+  application.name: product-activation
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/activation}
+    username: ${DB_USERNAME:activation}
+    password: ${DB_PASSWORD:activation}
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
+  flyway.enabled: true
+server:
+  error.include-message: never
+provider:
+  base-url: ${PROVIDER_BASE_URL:http://localhost:8081}
+  connect-timeout: ${PROVIDER_CONNECT_TIMEOUT:2s}
+  read-timeout: ${PROVIDER_READ_TIMEOUT:5s}
+management:
+  endpoints.web.exposure.include: health,info
+  endpoint.health.probes.enabled: true
