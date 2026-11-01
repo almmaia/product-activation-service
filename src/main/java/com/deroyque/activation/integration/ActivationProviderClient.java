@@ -8,10 +8,18 @@ public class ActivationProviderClient {
     private final RestClient client;
     public ActivationProviderClient(RestClient providerRestClient) { this.client = providerRestClient; }
     public void activate(ActivationRequest request) {
-        client.post().uri("/provider/v1/activate")
-            .header("Idempotency-Key", request.getId().toString())
-            .body(new ProviderActivation(request.getId().toString(), request.getCustomerId(), request.getProductCode()))
-            .retrieve().toBodilessEntity();
+        try {
+            client.post().uri("/provider/v1/activate")
+                .header("Idempotency-Key", request.getId().toString())
+                .body(new ProviderActivation(request.getId().toString(), request.getCustomerId(), request.getProductCode()))
+                .retrieve().toBodilessEntity();
+        } catch (RestClientResponseException exception) {
+            throw new ProviderResponseException(exception.getStatusCode(), exception);
+        } catch (ResourceAccessException exception) {
+            throw new ProviderCommunicationException(exception);
+        } catch (RestClientException exception) {
+            throw new ProviderInvalidResponseException(exception);
+        }
     }
     private record ProviderActivation(String requestId, String customerId, String productCode) { }
     

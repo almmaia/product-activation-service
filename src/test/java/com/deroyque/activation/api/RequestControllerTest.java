@@ -20,10 +20,11 @@ class RequestControllerTest {
     @MockitoBean ActivationRequestService service;
     @Test void createsAValidRequest() throws Exception {
         var request = ActivationRequest.pending("EXT-123", "CUST-100", "INTERNET-500");
+        request.startProcessing(); request.complete();
         when(orchestrator.createAndActivate(any())).thenReturn(new ActivationRequestService.Creation(request, true));
         mvc.perform(post("/api/v1/requests").contentType("application/json").content("{" + "\"externalId\":\"EXT-123\",\"customerId\":\"CUST-100\",\"productCode\":\"INTERNET-500\"}"))
             .andExpect(status().isCreated()).andExpect(header().string("Location", org.hamcrest.Matchers.containsString(request.getId().toString())))
-            .andExpect(jsonPath("$.status").value("PENDING"));
+            .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
     @Test void rejectsInvalidInput() throws Exception {
         mvc.perform(post("/api/v1/requests").contentType("application/json").content("{}"))

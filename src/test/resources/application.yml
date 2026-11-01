@@ -3,4 +3,7 @@ spring:
   datasource.driver-class-name: org.h2.Driver
   jpa.hibernate.ddl-auto: validate
   flyway.enabled: true
-provider.base-url: http://localhost:65534
+provider:
+  base-url: http://localhost:65534
+  connect-timeout: 100ms
+  read-timeout: 100ms

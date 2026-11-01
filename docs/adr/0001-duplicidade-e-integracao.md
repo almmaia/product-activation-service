@@ -10,6 +10,8 @@ Usei `external_id` com constraint `UNIQUE` como fonte de verdade para idempotên
 
 A criação é persistida em uma transação independente. Só depois do commit a orquestração muda o estado para `PROCESSING` e aciona o provedor, usando o UUID interno como chave de idempotência. O cliente possui timeouts de conexão e leitura configuráveis.
 
+Falhas conhecidas do provedor são classificadas em falha de comunicação, resposta HTTP não bem-sucedida e resposta inválida. Apenas elas resultam em `FAILED`. Falhas internas de persistência não são mascaradas como falha do provedor.
+
 ## Consequências
 
 Evito duplicidade entre instâncias sem lock distribuído e não prendo recursos do banco durante I/O. Ainda existe uma janela entre persistir e publicar a chamada externa em caso de queda do processo; para produção, o próximo passo é uma outbox transacional processada por worker, com reconciliação e retentativas seguras.

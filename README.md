@@ -70,6 +70,8 @@ Configurei o Flyway para aplicar as migrações automaticamente. Não versione s
 
 Quando a solicitação é nova, retorno `201 Created`, o header `Location`, UUID, status e datas em UTC/ISO-8601. Validei os três campos como obrigatórios, com até 100 caracteres e apenas letras, números, `_` e `-`.
 
+Quando o provedor aceita a ativação, a resposta de criação contém `status: "COMPLETED"`. Quando o provedor responde com erro HTTP tratável ou ocorre falha de comunicação, a solicitação é persistida com `status: "FAILED"` e esse é o status retornado na resposta. Não retorno `PENDING` como resposta de uma ativação síncrona já finalizada.
+
 ### Consultar solicitação
 
 `GET /api/v1/requests/{id}` retorna a solicitação e seu status. Quando o UUID não existe, retorno `404 Not Found`. Para validação, ausência e conflito, retornei respostas `application/problem+json`, sem expor stack traces ou detalhes internos.
@@ -99,13 +101,15 @@ Depois de persistir e confirmar a transação de criação, marco a solicitaçã
 
 Escolhi não fazer retry automático cego. Um timeout não confirma que o provedor deixou de processar a ativação; ele pode ter concluído e a resposta ter se perdido. Em uma evolução para produção, eu implementaria outbox transacional, worker assíncrono, backoff com jitter, limite de tentativas e reconciliação pela chave de idempotência.
 
+No código, diferenciei respostas HTTP não bem-sucedidas do provedor, falhas de comunicação (incluindo timeout) e respostas que não podem ser interpretadas pelo cliente. Apenas essas falhas conhecidas do provedor levam a solicitação para `FAILED`. Uma falha interna, como erro ao persistir `COMPLETED`, não é tratada como falha do provedor: ela sobe como erro interno, gera `ProblemDetail` com `traceId` e fica registrada no log para diagnóstico.
+
 ## Testes que implementei
 
 ```powershell
 ./mvnw.cmd test
 ```
 
-Implementei testes para criação válida, validação de entrada, consulta inexistente, unicidade no banco, transições de status e os cenários de sucesso e falha na orquestração do provedor. Executei a suíte neste ambiente com **7 testes, 0 falhas e 0 erros**.
+Implementei testes para criação válida, validação de entrada, consulta inexistente, unicidade no banco, transições de status e os cenários de sucesso e falha na orquestração do provedor. Também cobri o fluxo HTTP completo com um provedor local real, a resposta `COMPLETED`, a resposta `FAILED`, retry idempotente, conflito de payload, falha de comunicação e concorrência com seis criações simultâneas.
 
 Como próxima evolução, eu adicionaria Testcontainers com PostgreSQL real, WireMock/MockWebServer em testes HTTP e um teste de concorrência com múltiplas threads.
 
