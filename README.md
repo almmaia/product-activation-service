@@ -125,4 +125,4 @@ Se eu evoluísse esta solução, priorizaria filtros paginados por status e clie
 
 ## Uso de IA
 
-Utilizei IA como apoio para estruturar a solução, revisar decisões e redigir a documentação. Revisei o código e a documentação para garantir que descrevam somente o comportamento que está implementado e me preparei para explicar as decisões técnicas apresentadas neste repositório.
+Utilizei IA como apoio para estruturar a solução, revisar decisões e redigir a documentação. Revisei o código e a documentação para garantir que descrevam somente o comportamento que está implementado neste repositorio.
